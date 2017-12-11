@@ -1,0 +1,130 @@
+---
+title: "BaiduMusicScrape"
+author: "Thomas"
+date: "10/12/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages
+```{r}
+library(rvest)
+library(tidyverse)
+library(stringr)
+library(robotstxt)
+```
+
+# Scraping
+Can I scrape the website?
+```{r}
+robotstxt::paths_allowed("https://mojim.com/ush100951.htm0")
+```
+
+
+
+# Getting the links
+```{r}
+# set webpage 
+page <- read_html("https://mojim.com/ush100951.htm")
+
+link <- page %>%
+  html_nodes(xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "hc4", " " ))]//a | //*[contains(concat( " ", @class, " " ), concat( " ", "hc3", " " ))]//a') %>%
+  html_attr('href') 
+## because I used the xpath notation I am sure that I'm grabbing the right things, so the steps below are unnecessary this time
+
+
+#link
+
+link_check <- link %>%#[160:200] %>% #subset for wich ones I need
+  str_replace_all("/(usy.+)", "https://mojim.com/\\1") %>%#add website domain
+  as.tibble() %>%
+  filter(grepl("^https", value)) %>%
+  pull(value) #turns variable in tibble into vector
+
+
+
+```
+
+Scraping the webpages
+```{r echo = FALSE}
+teksten <- map_df(link_check, #use purrr map_df to get all in 1 df
+                function(url){
+                  text <- url %>%
+                    read_html() %>%
+                    html_nodes(xpath ='//*[(@id = "fsZx3")]') %>%
+                    html_text(trim = FALSE)
+                  
+                  fangwenshan <- str_extract(text, "方文山")
+                 
+                  if (is.na(fangwenshan)) {
+                    print("oh-oh")
+                  } else if (!(fangwenshan=TRUE)){
+                    print("what the fuck man")
+                  } else {
+                    text <- text %>%
+                    str_replace("(\\[ti:.+)?\\[\\d.+", "") %>%
+                    str_replace("Find more lyrics at ※ Mojim.com|更多更詳盡歌詞 在 ※ Mojim.com　魔鏡歌詞網 ", "")
+                    
+                    text <- strsplit(text, " ")
+                    
+                    titel <- url %>%
+                    read_html() %>%
+                    html_nodes(xpath ='//*[(@id = "fsZx2")]') %>%
+                    html_text()
+                  
+                    filename <- sprintf("./corpus/%s.txt", titel)
+                    if (!(length(filename) > 0)){
+                      print("pis kak foef")
+                    } else {
+                      print(url)
+                      write.table(text, file = filename)
+                    }
+                    
+                    
+                  }
+                })
+#View(teksten)
+```
+
+Er is een kleine foutenmarge; tussen twee blokken tekst ontbreekt een extra regel, dus het lijkt alsof het aan elkaar loopt. Op zich niet heel erg, maar een klein beetje ambetant. Ach ja.
+
+
+
+# Attempts before functionizing
+
+###Lyrics
+```{r one.lyrics}
+text <- read_html("https://mojim.com/twy100951x27x2.htm") %>%
+  html_nodes(xpath ='//*[(@id = "fsZx3")]') %>%
+  html_text() #%>%
+  str_replace("(\\[ti:.+)?\\[\\d.+", "") %>%
+  str_replace("Find more lyrics at ※ Mojim.com|更多更詳盡歌詞 在 ※ Mojim.com　魔鏡歌詞網 ", "")
+
+text2 <- strsplit(text, " ") %>%
+  as.data.frame(col.names = "lyrics") %>%
+  as.tibble()
+  
+```
+
+###Title
+```{r title}
+titel <- read_html("https://mojim.com/twy100951x27x2.htm") %>%
+  html_nodes(xpath ='//*[(@id = "fsZx2")]') %>%
+  html_text()
+
+titel
+```
+
+###Write in a document
+
+```{r write}
+write.table(text, "./test.txt") #change name
+```
+
+
+
+
+
